@@ -1,10 +1,9 @@
-VAULT_FILES = group_vars/gateway/vault.yml group_vars/webservers/vault.yml
+VAULT_FILES = group_vars/webservers/vault.yml
 
 install:
 	ansible-galaxy install -r requirements.yml --force
 syntax:
 	ansible-playbook playbook.yml --syntax-check
-	ansible-playbook setup_servers.yml --syntax-check
 	ansible-playbook setup_vpn.yml --syntax-check
 	ansible-playbook setup_gateway.yml --syntax-check
 lint:
@@ -12,13 +11,11 @@ lint:
 check: syntax lint
 deploy:
 	ansible-playbook playbook.yml
-initial-setup:
-	ansible-playbook setup_servers.yml -e "ansible_user=root"
 setup-vpn:
-	ansible-playbook setup_vpn.yml -e "ansible_user=root"
+	ansible-playbook setup_vpn.yml
 setup-gateway:
 	ansible-playbook setup_gateway.yml
-setup: initial-setup setup-vpn setup-gateway deploy
+setup: setup-vpn setup-gateway deploy
 
 vault-encrypt:
 	ansible-vault encrypt $(VAULT_FILES)

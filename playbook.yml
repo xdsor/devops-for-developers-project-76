@@ -2,17 +2,27 @@
 
 - name: Prepare servers
   hosts: all
-  become: true
   vars:
     pip_install_packages:
       - name: docker
+  pre_tasks:
+    - name: Ensure apt cache directory exists
+      ansible.builtin.file:
+        path: /var/lib/apt/lists
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
   roles:
     - geerlingguy.pip
     - geerlingguy.docker
 
 - name: Deploy Redmine on webservers
   hosts: all
-  become: true
   tasks:
     - name: Deploy Redmine
       when: "'webservers' in group_names"
@@ -88,7 +98,6 @@
 
 - name: Install Datadog Agent on webservers
   hosts: all
-  become: true
   tasks:
     - name: Check Datadog configuration
       ansible.builtin.assert:
