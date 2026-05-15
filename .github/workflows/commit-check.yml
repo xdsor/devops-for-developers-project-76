@@ -25,8 +25,5 @@ jobs:
       - name: Install Ansible Galaxy dependencies
         run: make install
 
-      - name: Disable local vault password file in CI
-        run: sed -i '/^vault_password_file =/d' ansible.cfg
-
       - name: Run commit check
         run: make commit-check
