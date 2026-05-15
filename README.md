@@ -5,7 +5,7 @@
 
 Набор Ansible playbook'ов для деплоя Redmine и настройки мониторинга Datadog.  
 URL для проверки приложения: https://na15min.ru.   
-Для запуска нужно создать .vault_pass в корне проекта с паролем от vault
+Для запуска можно создать .vault_pass в корне проекта с паролем от vault, после чего раскоментить строчку vault_password_file = .vault_pass в файле ansible.cfg
 
 ## Архитектура
 

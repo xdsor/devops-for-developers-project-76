@@ -1,4 +1,4 @@
-VAULT_FILES = group_vars/all/vault.yml group_vars/webservers/vault.yml
+VAULT_FILES = group_vars/gateway/vault.yml group_vars/webservers/vault.yml
 
 install:
 	ansible-galaxy install -r requirements.yml --force
