@@ -1,0 +1,106 @@
+---
+
+- name: Prepare servers
+  hosts: all
+  become: true
+  vars:
+    pip_install_packages:
+      - name: docker
+  roles:
+    - geerlingguy.pip
+    - geerlingguy.docker
+
+- name: Deploy Redmine on webservers
+  hosts: all
+  become: true
+  tasks:
+    - name: Deploy Redmine
+      when: "'webservers' in group_names"
+      block:
+        - name: Check Redmine configuration
+          ansible.builtin.assert:
+            that:
+              - redmine_port is defined
+              - redmine_db_host is defined
+              - redmine_db_host | length > 0
+              - redmine_db_password is defined
+              - redmine_db_password | length > 0
+              - redmine_secret_key_base is defined
+              - redmine_secret_key_base | length > 0
+            fail_msg: "Set redmine_port, redmine_db_host, redmine_db_password, and redmine_secret_key_base before deploying Redmine"
+
+        - name: Create Redmine config directory
+          ansible.builtin.file:
+            path: "{{ redmine_config_dir }}"
+            state: directory
+            owner: root
+            group: root
+            mode: "0755"
+
+        - name: Create Redmine data directory
+          ansible.builtin.file:
+            path: "{{ redmine_data_dir }}/files"
+            state: directory
+            owner: "999"
+            group: "999"
+            mode: "0755"
+
+        - name: Write Redmine env file
+          ansible.builtin.template:
+            src: redmine.env.j2
+            dest: "{{ redmine_env_file }}"
+            owner: root
+            group: root
+            mode: "0600"
+          notify: Recreate Redmine container
+          no_log: true
+
+        - name: Apply Redmine env changes before container check
+          ansible.builtin.meta: flush_handlers
+
+        - name: Run Redmine container
+          community.docker.docker_container:
+            name: redmine
+            image: "{{ redmine_image }}"
+            state: started
+            restart_policy: unless-stopped
+            env_file: "{{ redmine_env_file }}"
+            published_ports:
+              - "{{ redmine_bind_address | default('0.0.0.0') }}:{{ redmine_port }}:3000"
+            volumes:
+              - "{{ redmine_data_dir }}/files:/usr/src/redmine/files"
+          no_log: true
+
+  handlers:
+    - name: Recreate Redmine container
+      community.docker.docker_container:
+        name: redmine
+        image: "{{ redmine_image }}"
+        state: started
+        recreate: true
+        restart_policy: unless-stopped
+        env_file: "{{ redmine_env_file }}"
+        published_ports:
+          - "{{ redmine_bind_address | default('0.0.0.0') }}:{{ redmine_port }}:3000"
+        volumes:
+          - "{{ redmine_data_dir }}/files:/usr/src/redmine/files"
+      no_log: true
+
+- name: Install Datadog Agent on webservers
+  hosts: all
+  become: true
+  tasks:
+    - name: Check Datadog configuration
+      ansible.builtin.assert:
+        that:
+          - datadog_api_key is defined
+          - datadog_api_key | length > 0
+          - datadog_site is defined
+          - datadog_site | length > 0
+        fail_msg: "Set datadog_api_key and datadog_site before installing Datadog Agent"
+      when: "'webservers' in group_names"
+
+    - name: Install Datadog Agent
+      ansible.builtin.import_role:
+        name: datadog.dd.agent
+      when: "'webservers' in group_names"

@@ -3,25 +3,22 @@ VAULT_FILES = group_vars/all/vault.yml group_vars/webservers/vault.yml
 install:
 	ansible-galaxy install -r requirements.yml --force
 syntax:
+	ansible-playbook playbook.yml --syntax-check
 	ansible-playbook setup_servers.yml --syntax-check
 	ansible-playbook setup_vpn.yml --syntax-check
-	ansible-playbook setup_redmine.yml --syntax-check
 	ansible-playbook setup_gateway.yml --syntax-check
-	ansible-playbook setup_datadog.yml --syntax-check
 lint:
 	ansible-lint --exclude .ansible
 check: syntax lint
+deploy:
+	ansible-playbook playbook.yml
 initial-setup:
 	ansible-playbook setup_servers.yml -e "ansible_user=root"
 setup-vpn:
 	ansible-playbook setup_vpn.yml -e "ansible_user=root"
-setup-redmine:
-	ansible-playbook setup_redmine.yml
 setup-gateway:
 	ansible-playbook setup_gateway.yml
-setup-datadog:
-	ansible-playbook setup_datadog.yml
-setup: initial-setup setup-vpn setup-gateway setup-redmine setup-datadog
+setup: initial-setup setup-vpn setup-gateway deploy
 
 vault-encrypt:
 	ansible-vault encrypt $(VAULT_FILES)
