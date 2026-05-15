@@ -46,34 +46,10 @@ web1 ansible_host=1.2.3.4 ansible_user=root
 web2 ansible_host=1.2.3.5 ansible_user=root
 ```
 
-Переменные проекта находятся в директории `group_vars/`. Секреты должны храниться в vault-файлах:
-
-```text
-group_vars/all/vault.yml
-group_vars/webservers/vault.yml
-```
-
-Минимально нужны секретные значения:
-
-```yml
-svcacc_password: password
-redmine_db_password: password
-redmine_secret_key_base: secret
-datadog_api_key: api-key
-```
-
-Для локального запуска с Ansible Vault создайте файл `.vault_pass` в корне проекта.
-
 ## Основной деплой
 
 ```sh
 make deploy
-```
-
-Или напрямую:
-
-```sh
-ansible-playbook playbook.yml
 ```
 
 ## Команды для разработки
@@ -89,12 +65,9 @@ make commit-check  # Запустить check и проверить, что vaul
 ## Дополнительный VPS-деплой
 
 ```sh
-make initial-setup   # Подготовить серверы: Docker и системный аккаунт
 make setup-vpn       # Настроить WireGuard VPN
 make setup-gateway   # Настроить gateway/load balancer на Caddy
-make setup-redmine   # Развернуть Redmine
-make setup-datadog   # Настроить мониторинг Datadog
-make setup           # Выполнить полный деплой
+make deploy          # Redmine + Datadog
 ```
 
 ## Работа с vault
