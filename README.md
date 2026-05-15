@@ -1,5 +1,5 @@
 ### Hexlet tests and linter status:
-[![Actions Status](https://github.com/xdsor/devops-for-developers-project-76/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/xdsor/devops-for-developers-project-76/actions)
+[![Actions Status](https://github.com/xdsor/devops-for-developers-project-76/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/xdsor/devops-for-developers-project-76/actions) [![commit-check](https://github.com/xdsor/devops-for-developers-project-76/actions/workflows/commit-check.yml/badge.svg)](https://github.com/xdsor/devops-for-developers-project-76/actions/workflows/commit-check.yml)
 
 # Redmine Ansible Deploy
 
