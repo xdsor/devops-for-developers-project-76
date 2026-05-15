@@ -1,0 +1,88 @@
+---
+
+- name: Configure Caddy gateway
+  hosts: gateway
+  become: true
+  vars:
+    caddy_data_dir: /var/lib/caddy/data
+    caddy_config_dir: /var/lib/caddy/config
+  tasks:
+    - name: Check gateway configuration
+      ansible.builtin.assert:
+        that:
+          - gateway_domain is defined
+          - gateway_domain | length > 0
+          - redmine_port is defined
+          - groups['webservers'] | length > 0
+          - inventory_hostname in wg_vpn_ips
+        fail_msg: "Set gateway_domain, redmine_port, wg_vpn_ips, and webservers before configuring Caddy"
+
+    - name: Create Caddy config directory
+      ansible.builtin.file:
+        path: /etc/caddy
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Write Caddyfile
+      ansible.builtin.template:
+        src: Caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Caddy container
+
+    - name: Create Caddy state directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ caddy_data_dir }}"
+        - "{{ caddy_config_dir }}"
+
+    - name: Allow HTTP traffic on gateway
+      community.general.ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+
+    - name: Allow HTTPS traffic on gateway
+      community.general.ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+    - name: Run Caddy container
+      community.docker.docker_container:
+        name: caddy
+        image: caddy:2
+        state: started
+        restart_policy: unless-stopped
+        published_ports:
+          - "80:80"
+          - "443:443"
+        volumes:
+          - /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+          - "{{ caddy_data_dir }}:/data"
+          - "{{ caddy_config_dir }}:/config"
+
+  handlers:
+    - name: Restart Caddy container
+      community.docker.docker_container:
+        name: caddy
+        image: caddy:2
+        state: started
+        restart: true
+        restart_policy: unless-stopped
+        published_ports:
+          - "80:80"
+          - "443:443"
+        volumes:
+          - /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+          - "{{ caddy_data_dir }}:/data"
+          - "{{ caddy_config_dir }}:/config"

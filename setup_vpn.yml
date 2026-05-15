@@ -1,0 +1,151 @@
+---
+
+- name: Install WireGuard and generate keys
+  hosts: all
+  become: true
+  tasks:
+    - name: Check WireGuard VPN IP is configured
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in wg_vpn_ips
+          - wg_vpn_ip is match('^([0-9]{1,3}\.){3}[0-9]{1,3}$')
+        fail_msg: "Set wg_vpn_ips.{{ inventory_hostname }} in group_vars/all.yml"
+
+    - name: Install WireGuard
+      ansible.builtin.apt:
+        name: wireguard
+        state: present
+        update_cache: true
+
+    - name: Check if private key exists
+      ansible.builtin.stat:
+        path: /etc/wireguard/wg0_privatekey
+      register: _privkey_stat
+
+    - name: Generate private key
+      ansible.builtin.shell: umask 077 && wg genkey > /etc/wireguard/wg0_privatekey
+      when: not _privkey_stat.stat.exists
+      changed_when: true
+      no_log: true
+
+    - name: Set private key permissions
+      ansible.builtin.file:
+        path: /etc/wireguard/wg0_privatekey
+        mode: "0600"
+
+    - name: Read private key
+      ansible.builtin.slurp:
+        src: /etc/wireguard/wg0_privatekey
+      register: _privkey
+      no_log: true
+
+    - name: Derive public key
+      ansible.builtin.command:
+        cmd: wg pubkey
+        stdin: "{{ _privkey.content | b64decode | trim }}"
+      register: _pubkey
+      changed_when: false
+      no_log: true
+
+    - name: Store WireGuard keys
+      ansible.builtin.set_fact:
+        wg_private_key: "{{ _privkey.content | b64decode | trim }}"
+        wg_public_key: "{{ _pubkey.stdout }}"
+      no_log: true
+
+- name: Configure WireGuard gateway
+  hosts: gateway
+  become: true
+  tasks:
+    - name: Enable IP forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_set: true
+        state: present
+        reload: true
+
+    - name: Allow WireGuard UDP on gateway
+      community.general.ufw:
+        rule: allow
+        port: "{{ wg_port }}"
+        proto: udp
+
+    - name: Allow forwarded VPN traffic on gateway
+      community.general.ufw:
+        rule: allow
+        route: true
+        interface_in: wg0
+        interface_out: wg0
+        from_ip: "{{ wg_network }}"
+        to_ip: "{{ wg_network }}"
+
+    - name: Write gateway WireGuard config
+      ansible.builtin.copy:
+        dest: /etc/wireguard/wg0.conf
+        content: |
+          [Interface]
+          PrivateKey = {{ wg_private_key }}
+          Address = {{ wg_vpn_ip }}/24
+          ListenPort = {{ wg_port }}
+          PostUp = iptables -A FORWARD -i wg0 -o wg0 -j ACCEPT
+          PostDown = iptables -D FORWARD -i wg0 -o wg0 -j ACCEPT
+          {% for host in groups['webservers'] %}
+          [Peer]
+          PublicKey = {{ hostvars[host]['wg_public_key'] }}
+          AllowedIPs = {{ hostvars[host]['wg_vpn_ip'] }}/32
+          {% endfor %}
+        mode: "0600"
+      notify: Restart wg0
+      no_log: true
+
+    - name: Ensure WireGuard is running
+      ansible.builtin.service:
+        name: wg-quick@wg0
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart wg0
+      ansible.builtin.service:
+        name: wg-quick@wg0
+        state: restarted
+
+- name: Configure WireGuard clients
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Allow incoming VPN traffic on clients
+      community.general.ufw:
+        rule: allow
+        interface: wg0
+        direction: in
+
+    - name: Write client WireGuard config
+      ansible.builtin.copy:
+        dest: /etc/wireguard/wg0.conf
+        content: |
+          [Interface]
+          PrivateKey = {{ wg_private_key }}
+          Address = {{ wg_vpn_ip }}/24
+
+          [Peer]
+          PublicKey = {{ hostvars[groups['gateway'][0]]['wg_public_key'] }}
+          Endpoint = {{ hostvars[groups['gateway'][0]]['ansible_host'] }}:{{ wg_port }}
+          AllowedIPs = {{ wg_network }}
+          PersistentKeepalive = 25
+        mode: "0600"
+      notify: Restart wg0
+      no_log: true
+
+    - name: Ensure WireGuard is running
+      ansible.builtin.service:
+        name: wg-quick@wg0
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart wg0
+      ansible.builtin.service:
+        name: wg-quick@wg0
+        state: restarted

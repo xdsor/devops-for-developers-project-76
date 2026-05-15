@@ -1,0 +1,14 @@
+---
+
+redmine_port: 3000
+
+wg_subnet: "10.10.0"
+wg_network: "{{ wg_subnet }}.0/24"
+wg_port: 51820
+
+wg_vpn_ips:
+  gw: "{{ wg_subnet }}.1"
+  web1: "{{ wg_subnet }}.2"
+  web2: "{{ wg_subnet }}.3"
+
+wg_vpn_ip: "{{ wg_vpn_ips[inventory_hostname] }}"

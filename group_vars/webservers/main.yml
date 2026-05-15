@@ -1,0 +1,33 @@
+---
+
+redmine_image: redmine:latest
+redmine_config_dir: /etc/redmine
+redmine_env_file: "{{ redmine_config_dir }}/redmine.env"
+redmine_data_dir: /var/lib/redmine
+
+redmine_db_host: "scubedayudcus.beget.app"
+redmine_db_port: 3306
+redmine_db_name: redmine
+redmine_db_user: redmine
+
+datadog_site: datadoghq.eu
+datadog_agent_major_version: 7
+
+datadog_config:
+  hostname: "{{ inventory_hostname }}"
+  tags:
+    - "env:production"
+    - "service:redmine"
+    - "role:webserver"
+
+datadog_checks:
+  http_check:
+    init_config:
+    instances:
+      - name: redmine
+        url: "http://{{ wg_vpn_ip }}:{{ redmine_port }}/"
+        timeout: 5
+        tags:
+          - "env:production"
+          - "service:redmine"
+          - "role:webserver"

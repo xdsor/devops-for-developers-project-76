@@ -1,0 +1,8 @@
+{{ gateway_domain }} {
+    reverse_proxy {
+        lb_policy round_robin
+{% for host in groups['webservers'] %}
+        to {{ hostvars[host]['wg_vpn_ip'] }}:{{ redmine_port }}
+{% endfor %}
+    }
+}

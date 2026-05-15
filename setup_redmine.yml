@@ -1,0 +1,75 @@
+---
+
+- name: Deploy Redmine
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Check Redmine configuration
+      ansible.builtin.assert:
+        that:
+          - redmine_port is defined
+          - redmine_db_host is defined
+          - redmine_db_host | length > 0
+          - redmine_db_password is defined
+          - redmine_db_password | length > 0
+          - redmine_secret_key_base is defined
+          - redmine_secret_key_base | length > 0
+          - inventory_hostname in wg_vpn_ips
+        fail_msg: "Set redmine_port, redmine_db_host, redmine_db_password, redmine_secret_key_base, and wg_vpn_ips before deploying Redmine"
+
+    - name: Create Redmine config directory
+      ansible.builtin.file:
+        path: "{{ redmine_config_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create Redmine data directory
+      ansible.builtin.file:
+        path: "{{ redmine_data_dir }}/files"
+        state: directory
+        owner: "999"
+        group: "999"
+        mode: "0755"
+
+    - name: Write Redmine env file
+      ansible.builtin.template:
+        src: redmine.env.j2
+        dest: "{{ redmine_env_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Recreate Redmine container
+      no_log: true
+
+    - name: Apply Redmine env changes before container check
+      ansible.builtin.meta: flush_handlers
+
+    - name: Run Redmine container
+      community.docker.docker_container:
+        name: redmine
+        image: "{{ redmine_image }}"
+        state: started
+        restart_policy: unless-stopped
+        env_file: "{{ redmine_env_file }}"
+        published_ports:
+          - "{{ wg_vpn_ip }}:{{ redmine_port }}:3000"
+        volumes:
+          - "{{ redmine_data_dir }}/files:/usr/src/redmine/files"
+      no_log: true
+
+  handlers:
+    - name: Recreate Redmine container
+      community.docker.docker_container:
+        name: redmine
+        image: "{{ redmine_image }}"
+        state: started
+        recreate: true
+        restart_policy: unless-stopped
+        env_file: "{{ redmine_env_file }}"
+        published_ports:
+          - "{{ wg_vpn_ip }}:{{ redmine_port }}:3000"
+        volumes:
+          - "{{ redmine_data_dir }}/files:/usr/src/redmine/files"
+      no_log: true
